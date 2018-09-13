@@ -140,6 +140,7 @@ func (c *Cluster) validateClusterInstancePoolTypes() error {
 		poolMap = map[string]bool{
 			clusterv1alpha1.InstancePoolTypeVault:   true,
 			clusterv1alpha1.InstancePoolTypeBastion: true,
+			clusterv1alpha1.InstancePoolTypeJenkins: true,
 		}
 
 		break
@@ -295,6 +296,10 @@ func (c *Cluster) validateInstancePools() error {
 
 	// validate instance pool count according to cluster type
 	if err := c.validateClusterInstancePoolCount(); err != nil {
+		return err
+	}
+
+	if err := c.validateSubnets(); err != nil {
 		return err
 	}
 
@@ -494,6 +499,10 @@ func (c *Cluster) validateClusterAutoscaler() (result error) {
 		}
 		if (c.Config().Kubernetes.ClusterAutoscaler.Overprovisioning.Image != "" || c.Config().Kubernetes.ClusterAutoscaler.Overprovisioning.Version != "") && (c.Config().Kubernetes.ClusterAutoscaler.Overprovisioning.CoresPerReplica == 0 && c.Config().Kubernetes.ClusterAutoscaler.Overprovisioning.NodesPerReplica == 0) {
 			return fmt.Errorf("setting overprovisioning image or version is only valid when proportional overprovisioning is enabled")
+		}
+
+		if s := c.Config().Kubernetes.ClusterAutoscaler.ScaleDownThreshold; s != nil && (*s < 0 || *s > 1) {
+			return fmt.Errorf("scale down threshold '%v' unacceptable, must be value between 0 and 1", *c.Config().Kubernetes.ClusterAutoscaler.ScaleDownThreshold)
 		}
 	}
 
@@ -836,4 +845,30 @@ func (c *Cluster) PublicAPIHostname() string {
 		c.Name(),
 		c.Environment().Provider().PublicZone(),
 	)
+}
+
+func (c *Cluster) validateSubnets() error {
+	var result *multierror.Error
+
+	if c.Type() == clusterv1alpha1.ClusterTypeClusterMulti && c.Environment().Hub() != nil {
+		hSubnets := c.Environment().Hub().Subnets()
+
+		for _, cNet := range c.Subnets() {
+			found := false
+
+			for _, hNet := range hSubnets {
+				if cNet.Zone == hNet.Zone {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				err := fmt.Errorf("hub cluster does not include zone '%s'", cNet.Zone)
+				result = multierror.Append(result, err)
+			}
+		}
+	}
+
+	return result.ErrorOrNil()
 }

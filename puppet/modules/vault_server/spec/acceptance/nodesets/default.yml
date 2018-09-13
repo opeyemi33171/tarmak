@@ -1,0 +1,15 @@
+---
+HOSTS:
+  vault-1:
+    roles:
+      - consul
+      - vault_server
+    platform: el-7-x86_64
+    box: centos/7
+    box_version: 1804.02
+    hypervisor: vagrant_libvirt
+CONFIG:
+  type: foss
+  trace_limit: 1024
+  libvirt:
+    random_hostname: true

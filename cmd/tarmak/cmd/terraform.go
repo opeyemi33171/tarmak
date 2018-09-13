@@ -4,16 +4,15 @@ package cmd
 import (
 	"os"
 
-	"github.com/hashicorp/go-plugin"
 	"github.com/spf13/cobra"
 
+	"github.com/jetstack/tarmak/pkg/tarmak/utils"
 	"github.com/jetstack/tarmak/pkg/terraform"
 )
 
 // ensure plugin clients get closed after subcommand run
-func terraformPassthrough(args []string, f func([]string) int) int {
-	defer plugin.CleanupClients()
-	return f(args)
+func terraformPassthrough(args []string, f func([]string, <-chan struct{}) int) int {
+	return f(args, utils.MakeShutdownCh())
 }
 
 var internalPluginCmd = &cobra.Command{
